@@ -10,7 +10,6 @@ contract Courses {
         string content;
         string answer;
         uint price;     // 单位：wei
-
         uint copyrightprice;
     }
 
@@ -39,14 +38,11 @@ contract Courses {
         string title
     );
 
-    event CourseInfoChange(
-        address Changer,
-        uint index,
-        string title
-    );
+
 
     event BuyCourseCopyRight(
         address buyer, 
+        address origin_owner,
         uint index,
         string title
     );
@@ -56,13 +52,20 @@ contract Courses {
         uint index,
         string title
     );
-
+    
+    event CourseInfoChange(
+        address Changer,
+        uint index,
+        string title,
+        uint price,
+        uint copyrightprice
+    );
     
     uint public course_num = 0;
 
     // 视作加密的中心化数据库
     mapping(uint => Course) course_list;
-
+    //视作区块链
     mapping(uint => CourseForPublic) public course_for_public_list;
 
     constructor() public payable {}
@@ -94,6 +97,7 @@ contract Courses {
         emit AddCourse(msg.sender, course_num-1, title, price);
     }
     
+
     function buyCourse(uint index) public payable returns (string memory) {
         Course memory course = course_list[index];
         // 确认买家付了正确的钱给合约，合约再付钱给卖家；否则将钱退回给买家
@@ -110,13 +114,14 @@ contract Courses {
         }
     }
 
+    //买版权加入了从谁那里买来的，没用的话就删了也行
     function buyCourseCopyRight(uint index) public payable returns (string memory) {
         Course memory course = course_list[index];
         // 确认买家付了正确的钱给合约，合约再付钱给卖家；否则将钱退回给买家
         if (msg.value == course.copyrightprice) {
             //抽成
             course.publisher.transfer(course.copyrightprice*4/5);
-            emit BuyCourseCopyRight(msg.sender, index, course.title);
+            emit BuyCourseCopyRight(msg.sender,course.publisher, index, course.title);
 
             // 需要记录最初发布者吗，以及这样赋值是允许的吗
             course.publisher = msg.sender;
@@ -129,7 +134,7 @@ contract Courses {
         }
     }
 
-
+    //判定两个字符串是否相等
     function isEqual(string memory a, string memory b) public pure returns (bool) {
         bytes memory aa = bytes(a);
         bytes memory bb = bytes(b);
@@ -153,14 +158,42 @@ contract Courses {
             emit VerifyAnsReward(msg.sender, index, course.title);
             return ("RightAns, Get reward , success!",reward);
         }
-        else { 
-            // msg.sender.transfer(msg.value);
-            // Assert.equal()// assert or return?
+        else {
             return ("wrong ans! Try again later!",0);
         }
     }
 
-    //TODO: 更改课程信息CourseInfoChange
-    // function courseInfoChange
+
+    //不可以修改内容，只能改title
+    //建议加个付账才能改doge
+    function courseInfoChange(
+                    uint index,
+                    string memory title, 
+                    // string memory content,
+                    string memory answer,
+                    uint price,
+                    uint copyrightprice) public returns (string memory) {
+        
+        // 这里是防止课程卖了之后等可能出现bug的情况
+        if (msg.sender != course_list[index].publisher) {
+            return("Not publisher, permission denied");
+        }
+        else{
+            course_list[index].title = title;
+            course_for_public_list[index].title = title;
+
+            course_list[index].answer = answer;
+            // course_for_public_list[index].answer = answer;
+
+            course_list[index].price = price;
+            course_for_public_list[index].price = price;
+
+            course_list[index].copyrightprice = copyrightprice;
+            course_for_public_list[index].copyrightprice = copyrightprice;
+
+            emit CourseInfoChange(msg.sender,index,title,price,copyrightprice);
+            return ("Successfully changed course info");
+        }
+    }
 
 }
